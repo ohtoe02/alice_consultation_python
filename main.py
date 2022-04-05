@@ -1,7 +1,6 @@
 from aiohttp import web
 from aioalice import Dispatcher, get_new_configured_app
 
-
 WEBHOOK_URL_PATH = '/consultation-service/'  # webhook endpoint
 
 WEBAPP_HOST = 'localhost'
