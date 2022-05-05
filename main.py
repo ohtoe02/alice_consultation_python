@@ -66,6 +66,41 @@ async def selecting_course(alice_request):
         temp_text = Courses_RTF().courses[1].get_param_info(alice_request.request.command.lower())
         print(temp_text)
 
+    if re.search(r'прикладн\w* информатик\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[2].get_brief_info())
+        temp_text = Courses_RTF().courses[2].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'информатик\w* и\w* вычислительн\w* техник\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[3].get_brief_info())
+        temp_text = Courses_RTF().courses[3].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'вычислительн\w* техник\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[3].get_brief_info())
+        temp_text = Courses_RTF().courses[3].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'радиотехник\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[4].get_brief_info())
+        temp_text = Courses_RTF().courses[4].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'инфокоммуникционн\w* технолог\w* и\w* систем\w* связ\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[5].get_brief_info())
+        temp_text = Courses_RTF().courses[5].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'систем\w* связ\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[5].get_brief_info())
+        temp_text = Courses_RTF().courses[5].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
+    if re.search(r'инфокоммуникционн\w* технолог\w*', alice_request.request.command.lower()):
+        text = str(Courses_RTF().courses[5].get_brief_info())
+        temp_text = Courses_RTF().courses[5].get_param_info(alice_request.request.command.lower())
+        print(temp_text)
+
     if re.search(r'команд\w*', alice_request.request.command.lower()):
         text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n' \
                '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n' \
