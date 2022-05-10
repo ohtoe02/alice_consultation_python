@@ -205,41 +205,41 @@ class Courses_RTF:
             titles.append(item.title)
         return titles
 
-    def add_course(self,
-                   title=None,
-                   short_description=None,
-                   tags=None,
-                   budget_places=None,
-                   pass_score=None,
-                   edu_form=None,
-                   number=None,
-                   price=None,
-                   exams=None,
-                   leader=None,
-                   professions=None,
-                   special_addons=None
-                   ):
-        self.courses.append(
-            Course(
-                title=title,
-                number=number,
-                short_description=short_description,
-                price=price,
-                tags=tags,
-                budget_places=budget_places,
-                pass_score=pass_score,
-                exams=exams,
-                edu_form=edu_form,
-                leader=leader,
-                professions=professions,
-                special_addons=special_addons,
-            ))
+    # def add_course(self,
+    #                title=None,
+    #                short_description=None,
+    #                tags=None,
+    #                budget_places=None,
+    #                pass_score=None,
+    #                edu_form=None,
+    #                number=None,
+    #                price=None,
+    #                exams=None,
+    #                leader=None,
+    #                professions=None,
+    #                special_addons=None
+    #                ):
+    #     self.courses.append(
+    #         Course(
+    #             title=title,
+    #             number=number,
+    #             short_description=short_description,
+    #             price=price,
+    #             tags=tags,
+    #             budget_places=budget_places,
+    #             pass_score=pass_score,
+    #             exams=exams,
+    #             edu_form=edu_form,
+    #             leader=leader,
+    #             professions=professions,
+    #             special_addons=special_addons,
+    #         ))
 
-    def get_courses_names(self):
-        res = f'Курсы института {self.title}:\n\n'
-        for item in self.courses:
-            res += str(item) + ';\n'
-        return res
+    # def get_courses_names(self):
+    #     res = f'Курсы института {self.title}:\n\n'
+    #     for item in self.courses:
+    #         res += str(item) + ';\n'
+    #     return res
 
     def __str__(self):
         return '\n'.join(str(self.courses))

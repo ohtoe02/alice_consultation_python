@@ -11,8 +11,6 @@ class Course:
         'number': 'Номер направления: ',
     }
 
-
-
     def __init__(
             self,
             title=None,
@@ -44,20 +42,32 @@ class Course:
         self.special_addons = special_addons
 
     def get_brief_info(self):
-        return f'{self.title}\n\n' \
+        text = f'{self.title}\n\n\n' \
                f'{self.short_description}\n\n' \
                f'{self.introductions["edu_form"]}{self.edu_form}\n\n' \
                f'{self.introductions["price"]}{self.price} ₽\n\n' \
                f'{self.introductions["budget_places"]}{self.budget_places}\n\n' \
-               f'{self.introductions["pass_score"]}{self.pass_score} '
+               f'{self.introductions["pass_score"]}{self.pass_score}'
+        return {
+            "title": self.title,
+            "short_description": self.short_description,
+            "edu_form": self.edu_form,
+            "price": self.price,
+            "budget_places": self.budget_places,
+            "pass_score": self.pass_score,
+            "full_description": text
+        }
 
     def get_professions_string(self):
         return ";\n".join(self.professions)
 
     def get_param_info(self, phrase):
         text_params = [
-            (r'подробн\w* описан\w* | подробне\w* | поподробн\w*', f'{self.title}\n\nПодробное описание:\n{self.full_description}'),
-            (r'цен\w* | стои\w* | денег | деньг\w*', f'{self.title}\n\nСтоимость обучения обойдется в \n{self.price} ₽'),
+            (r'подробн\w* описан\w*|подробне\w*|поподробн\w*',
+             f'{self.title}\n\n\nПодробное описание:\n{self.full_description}'),
+            (
+                r'цен\w*|стоимост\w*|денег|деньг\w*',
+                f'{self.title}\n\nСтоимость обучения обойдется в \n{self.price} ₽'),
             (r'ном\w*', f'{self.title}\n\nНомер направления: {self.number}'),
             (r'бюдж\w* мест\w*', f'{self.title}\n\nБюджетных мест на направлении: {self.budget_places}'),
             (r'прох\w* бал\w*', f'{self.title}\n\nПроходной балл в прошлом году был: {self.pass_score}'),

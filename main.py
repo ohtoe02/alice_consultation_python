@@ -1,5 +1,6 @@
 import logging
 import re
+import pyrebase
 
 from all_courses import Courses_RTF
 
@@ -8,15 +9,26 @@ from aioalice import Dispatcher, get_new_configured_app, types
 from aioalice.dispatcher import MemoryStorage, SkipHandler
 from aioalice.utils.helper import Helper, HelperMode, Item
 
+
 WEBHOOK_URL_PATH = '/consultation-service/'  # webhook endpoint
 
 WEBAPP_HOST = 'localhost'
 WEBAPP_PORT = 3001
 
+firebase_config = {
+        "apiKey": "AIzaSyC7DIzFCt02mY2KhW8FAmw6n5qp8jTHx38",
+        "authDomain": "alice-consultation-skill.firebaseapp.com",
+        "databaseURL": "https://alice-consultation-skill-default-rtdb.europe-west1.firebasedatabase.app",
+        "storageBucket": "alice-consultation-skill.appspot.com"
+    }
+
+firebase = pyrebase.initialize_app(firebase_config)
+
 logging.basicConfig(format=u'%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s',
                     level=logging.INFO)
 
 dp = Dispatcher(storage=MemoryStorage())
+
 
 CANCEL_TEXTS = ['отмени', "отмена", 'прекрати', 'выйти', 'выход', 'назад']
 PARAMS_WORDS = ['цена', 'стоимость', 'денег', 'деньги', 'мест', 'места', '']
@@ -35,18 +47,46 @@ class ConsultationStates(Helper):
 async def take_all_requests(alice_request):
     # Логгируем запрос. Можно записывать в БД и тд
     logging.debug('New request! %r', alice_request)
+    db_push_user_request(alice_request.session.user_id, alice_request.request.command.lower())
     # Поднимаем исключение, по которому обработка перейдёт
     # к следующему хэндлеру, у которого подойдут фильтры
     raise SkipHandler
 
 
+def db_push_data(path, data):
+    db = firebase.database()
+    db.child(path).push(data)
+
+
+def db_push_user_request(user, command):
+    db_push_data(f'requests/users/{user}', {"text": command})
+
+
+def fetch_courses():
+    db = firebase.database()
+    courses = [item.val() for item in db.child("dialogs").get()]
+    return courses
+
+
+def get_titles():
+    courses = fetch_courses()
+    return [item["title"] for item in courses]
+
+
+def get_courses_names():
+    res = f'Курсы института ИРиТ-РТФ:\n\n'
+    for item in get_titles():
+        res += str(item) + ';\n'
+    return res
+
+
 def get_lower_courses():
-    courses = map(lambda x: x.lower(), Courses_RTF().get_titles())
+    courses = map(lambda x: x.lower(), get_titles())
     return courses
 
 
 def get_courses():
-    courses = Courses_RTF().get_titles()
+    courses = get_titles()
     return '\n'.join(courses)
 
 
@@ -56,15 +96,18 @@ async def selecting_course(alice_request):
     text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
            'некорректно. Если вам необходим список команд, то можете сказать "Команды" '
     temp_text = None
+    items = None
+    image = None
+    command = alice_request.request.command.lower()
 
-    if re.search(r'программн\w* инженер\w*', alice_request.request.command.lower()):
-        text = str(Courses_RTF().courses[0].get_brief_info())
-        temp_text = Courses_RTF().courses[0].get_param_info(alice_request.request.command.lower())
+    if re.search(r'программн\w* инженер\w*', command):
+        items = Courses_RTF().courses[0].get_brief_info()
+        # image = "997614/401120b6804872375c24"
+        temp_text = Courses_RTF().courses[0].get_param_info(command)
 
-    if re.search(r'информационн\w* безопасност\w*', alice_request.request.command.lower()):
-        text = str(Courses_RTF().courses[1].get_brief_info())
-        temp_text = Courses_RTF().courses[1].get_param_info(alice_request.request.command.lower())
-        print(temp_text)
+    if re.search(r'информационн\w* безопасност\w*', command):
+        items = Courses_RTF().courses[1].get_brief_info()
+        temp_text = Courses_RTF().courses[1].get_param_info(command)
 
     if re.search(r'прикладн\w* информатик\w*', alice_request.request.command.lower()):
         text = str(Courses_RTF().courses[2].get_brief_info())
@@ -101,15 +144,15 @@ async def selecting_course(alice_request):
         temp_text = Courses_RTF().courses[5].get_param_info(alice_request.request.command.lower())
         print(temp_text)
 
-    if re.search(r'команд\w*', alice_request.request.command.lower()):
+    if re.search(r'команд\w*', command):
         text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n' \
                '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n' \
                '"Команды" - для получения списка команд\n'
 
-    if re.search(r'направл\w* | дисципл\w*', alice_request.request.command.lower()):
-        return alice_request.response(Courses_RTF().get_courses_names())
+    if re.search(r'направл\w*|дисципл\w*', command):
+        return alice_request.response(get_courses_names())
 
-    if re.search(r'институт\w*', alice_request.request.command.lower()):
+    if re.search(r'институт\w*', command):
         return alice_request.response_items_list('Институты', 'Институты УрФУ', [
             {
                 "image_id": '1521359/e03c6d224fa1dcdca183',
@@ -158,7 +201,7 @@ async def selecting_course(alice_request):
             }
         ], buttons=['Далее'])
 
-    return alice_request.response(temp_text if temp_text else text, buttons=['Все дисциплины', 'Команды'])
+    return alice_request.response_big_image(f'{temp_text}\n\n \n\nМожет быть вам что-то еще интересно?' if temp_text else items['short_description'], image, title=items["title"], description=items["short_description"], buttons=['Все дисциплины', 'Команды']) if image else alice_request.response(f'{temp_text}\n\n \n\nМожет быть вам что-то еще интересно?' if temp_text else items["full_description"] if items else text, buttons=['Все дисциплины', 'Команды'])
 
 
 @dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
