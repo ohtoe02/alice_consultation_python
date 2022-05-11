@@ -1,15 +1,13 @@
-from datetime import datetime
 import logging
 import re
 import pyrebase
-
-from all_courses import Courses_RTF
 
 from aiohttp import web
 from aioalice import Dispatcher, get_new_configured_app, types
 from aioalice.dispatcher import MemoryStorage, SkipHandler
 from aioalice.utils.helper import Helper, HelperMode, Item
 
+from course import get_brief_info, get_param_info
 
 WEBHOOK_URL_PATH = '/consultation-service/'  # webhook endpoint
 
@@ -68,6 +66,14 @@ def fetch_courses():
     return courses
 
 
+def fetch_one_course(title):
+    db = firebase.database()
+    course_ref = db.child("refs").child(title).get().val()
+    course = db.child("dialogs").child(course_ref).get().val()
+    print(course)
+    return course
+
+
 def get_titles():
     courses = fetch_courses()
     return [item["title"] for item in courses]
@@ -99,32 +105,39 @@ async def selecting_course(alice_request):
     command = alice_request.request.command.lower()
 
     if re.search(r'программн\w* инженер\w*', command):
-        items = Courses_RTF().courses[0].get_brief_info()
-        temp_text = Courses_RTF().courses[0].get_param_info(command)
+        current_course = fetch_one_course('Программная инженерия')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'информационн\w* безопасност\w*', command):
-        items = Courses_RTF().courses[1].get_brief_info()
-        temp_text = Courses_RTF().courses[1].get_param_info(command)
+        current_course = fetch_one_course('Информационная безопасность')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'прикладн\w* информатик\w*', command):
-        items = Courses_RTF().courses[2].get_brief_info()
-        temp_text = Courses_RTF().courses[2].get_param_info(command)
+        current_course = fetch_one_course('Прикладная информатика')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'информатик\w* вычислительн\w* техник\w*', command):
-        items = Courses_RTF().courses[3].get_brief_info()
-        temp_text = Courses_RTF().courses[3].get_param_info(command)
+        current_course = fetch_one_course('Информатика и вычислительная техника')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'вычислительн\w* техник\w*', command):
-        items = Courses_RTF().courses[3].get_brief_info()
-        temp_text = Courses_RTF().courses[3].get_param_info(command)
+        current_course = fetch_one_course('Информатика и вычислительная техника')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'радиотехник\w*', command):
-        items = Courses_RTF().courses[4].get_brief_info()
-        temp_text = Courses_RTF().courses[4].get_param_info(command)
+        current_course = fetch_one_course('Радиотехника')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'инфокоммуникац\w* технолог\w*|систем\w* связ\w*', command):
-        items = Courses_RTF().courses[5].get_brief_info()
-        temp_text = Courses_RTF().courses[5].get_param_info(command)
+        current_course = fetch_one_course('Инфокоммуникационные технологии и системы связи')
+        text = get_brief_info(current_course)
+        temp_text = get_param_info(current_course, command)
 
     if re.search(r'команд\w*', command):
         text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n' \
@@ -134,57 +147,9 @@ async def selecting_course(alice_request):
     if re.search(r'направл\w*|дисципл\w*', command):
         text = get_courses_names()
 
-    if re.search(r'институт\w*', command):
-        return alice_request.response_items_list('Институты', 'Институты УрФУ', [
-            {
-                "image_id": '1521359/e03c6d224fa1dcdca183',
-                "title": 'ИРИТ-РТФ',
-                "description": "Специальности ИРИТ-РТФ",
-                "button": {
-                    "text": 'Образовательные программы',
-                    "url": 'https://priem-rtf.urfu.ru/ru/baccalaureate/'
-                }
-            },
-            {
-                "image_id": '1521359/e03c6d224fa1dcdca183',
-                "title": 'ИнФО',
-                "description": "Специальности ИнФО",
-                "button": {
-                    "text": 'Образовательные программы',
-                    "url": 'https://info.urfu.ru/ru/entrant-info/bakalavriatspecialitet/'
-                }
-            },
-            {
-                "image_id": '1521359/e03c6d224fa1dcdca183',
-                "title": 'УГИ',
-                "description": "Специальности УГИ",
-                "button": {
-                    "text": 'Образовательные программы',
-                    "url": 'https://urgi.urfu.ru/ru/kak-postupit/napravlenija-podgotovki/'
-                }
-            },
-            {
-                "image_id": '1521359/e03c6d224fa1dcdca183',
-                "title": 'ИнЭУ',
-                "description": "Специальности ИнЭУ",
-                "button": {
-                    "text": 'Образовательные программы',
-                    "url": 'https://gsem.urfu.ru/ru/applicants/bakalavriat-i-specialitet/obrazovatelnye-programmy-bakalavriata-i-specialiteta/'
-                }
-            },
-            {
-                "image_id": '1521359/e03c6d224fa1dcdca183',
-                "title": 'ХТИ',
-                "description": "Специальности ХТИ",
-                "button": {
-                    "text": 'Образовательные программы',
-                    "url": 'https://hti.urfu.ru/ru/abiturientam/bakalavriat/'
-                }
-            }
-        ], buttons=['Далее'])
     res_text = f'{temp_text}\n\n \n\nМожет быть вам что-то еще интересно?' \
         if temp_text \
-        else items["full_description"] if items \
+        else items if items \
         else text
     await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text})
     return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
@@ -193,7 +158,7 @@ async def selecting_course(alice_request):
 @dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
 async def select_activity(alice_request):
     user_id = alice_request.session.user_id
-    new_state = ConsultationStates.CONSULTATION
+    new_state = ConsultationStates.SELECT_ACTIVITY
     text = 'Такая функция пока мне неизвестна, попробуй одну из уже имеющихся!'
     buttons = ACTIVITIES_LIST
     if re.search(r'консультац\w+', alice_request.request.command.lower()):
