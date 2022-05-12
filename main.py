@@ -62,16 +62,31 @@ async def db_push_user_request(user, command):
 
 def fetch_courses():
     db = firebase.database()
-    courses = [item.val() for item in db.child("dialogs").get()]
+    courses = [item.val() for item in db.child("dialogs").child("courses").get()]
     return courses
 
 
 def fetch_one_course(title):
     db = firebase.database()
     course_ref = db.child("refs").child(title).get().val()
-    course = db.child("dialogs").child(course_ref).get().val()
-    print(course)
+    course = db.child("dialogs").child("courses").child(course_ref).get().val()
     return course
+
+
+def get_custom_dialog(state, command):
+    db = firebase.database()
+    custom_dialogs = db.child("dialogs").child(state).child("custom_dialogs").get().val()
+    for item in custom_dialogs:
+        keywords = item["keywords"].split()
+        is_good = True
+        for keyword in keywords:
+            if keyword not in command:
+                is_good = False
+                break
+        if not is_good:
+            continue
+        return item["answer"]
+    return None
 
 
 def get_titles():
@@ -109,47 +124,52 @@ async def selecting_course(alice_request):
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'информационн\w* безопасност\w*', command):
+    elif re.search(r'информационн\w* безопасност\w*', command):
         current_course = fetch_one_course('Информационная безопасность')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'прикладн\w* информатик\w*', command):
+    elif re.search(r'прикладн\w* информатик\w*', command):
         current_course = fetch_one_course('Прикладная информатика')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'информатик\w* вычислительн\w* техник\w*', command):
+    elif re.search(r'информатик\w* вычислительн\w* техник\w*', command):
         current_course = fetch_one_course('Информатика и вычислительная техника')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'вычислительн\w* техник\w*', command):
+    elif re.search(r'вычислительн\w* техник\w*', command):
         current_course = fetch_one_course('Информатика и вычислительная техника')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'радиотехник\w*', command):
+    elif re.search(r'радиотехник\w*', command):
         current_course = fetch_one_course('Радиотехника')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'инфокоммуникац\w* технолог\w*|систем\w* связ\w*', command):
+    elif re.search(r'инфокоммуникац\w* технолог\w*|систем\w* связ\w*', command):
         current_course = fetch_one_course('Инфокоммуникационные технологии и системы связи')
         text = get_brief_info(current_course)
         temp_text = get_param_info(current_course, command)
 
-    if re.search(r'команд\w*', command):
+    elif re.search(r'команд\w*', command):
         text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n' \
                '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n' \
                '"Команды" - для получения списка команд\n'
 
-    if re.search(r'направл\w*|дисципл\w*', command):
+    elif re.search(r'направл\w*|дисципл\w*', command):
         text = get_courses_names()
+
+    else:
+        temp_text = get_custom_dialog("courses", command)
+
+    if temp_text is None:
+        temp_text = get_custom_dialog("general", command)
 
     res_text = f'{temp_text}\n\n \n\nМожет быть вам что-то еще интересно?' \
         if temp_text \
-        else items if items \
         else text
     await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text})
     return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
@@ -159,7 +179,10 @@ async def selecting_course(alice_request):
 async def select_activity(alice_request):
     user_id = alice_request.session.user_id
     new_state = ConsultationStates.SELECT_ACTIVITY
-    text = 'Такая функция пока мне неизвестна, попробуй одну из уже имеющихся!'
+    command = alice_request.request.command
+    text = 'Такая функция пока мне неизвестна, попробуй одну из уже имеющихся!' \
+        if len(command) > 0 \
+        else "Ну привет, чего ты такой неразговорчивый?"
     buttons = ACTIVITIES_LIST
     if re.search(r'консультац\w+', alice_request.request.command.lower()):
         new_state = ConsultationStates.CONSULTATION
@@ -173,7 +196,8 @@ async def select_activity(alice_request):
                'и т.д.'
         buttons = ['Все дисциплины', 'Команды']
     await dp.storage.set_state(user_id, new_state)
-    return alice_request.response(text, buttons=buttons)
+    temp_text = get_custom_dialog("general", command)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
 
 
 @dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
