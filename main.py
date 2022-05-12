@@ -42,15 +42,6 @@ class ConsultationStates(Helper):
     PROFILE = Item()
 
 
-@dp.request_handler()
-async def take_all_requests(alice_request):
-    # Логгируем запрос. Можно записывать в БД и тд
-    logging.debug('New request! %r', alice_request)
-    # Поднимаем исключение, по которому обработка перейдёт
-    # к следующему хэндлеру, у которого подойдут фильтры
-    raise SkipHandler
-
-
 async def db_push_data(path, data):
     db = firebase.database()
     db.child(path).push(data)
@@ -116,7 +107,6 @@ async def selecting_course(alice_request):
     text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
            'некорректно. Если вам необходим список команд, то можете сказать "Команды" '
     temp_text = None
-    items = None
     command = alice_request.request.command.lower()
 
     if re.search(r'программн\w* инженер\w*', command):
