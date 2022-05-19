@@ -1,6 +1,10 @@
 import logging
 import re
+import string
+from langdetect import detect
+
 import pyrebase
+import math
 
 from aiohttp import web
 from aioalice import Dispatcher, get_new_configured_app, types
@@ -64,9 +68,9 @@ def fetch_one_course(title):
     return course
 
 
-def get_custom_dialog(state, command):
+def get_custom_dialog(command):
     db = firebase.database()
-    custom_dialogs = db.child("dialogs").child(state).child("custom_dialogs").get().val()
+    custom_dialogs = db.child("dialogs").child("general").child("custom_dialogs").get().val()
     for item in custom_dialogs:
         keywords = item["keywords"].split()
         is_good = True
@@ -81,68 +85,72 @@ def get_custom_dialog(state, command):
 
 
 def get_titles():
-    courses = fetch_courses()
-    return [item["title"] for item in courses]
+    db = firebase.database()
+    refs = db.child("refs").get()
+
+    return [item.key() for item in refs]
 
 
 def get_courses_names():
-    res = f'Курсы института ИРиТ-РТФ:\n\n'
-    for item in get_titles():
+    res = f'Курсы института ИРиТ-РТФ:\n \n'
+    for item in sorted(get_upper_titles()):
         res += str(item) + ';\n'
     return res
 
 
-def get_lower_courses():
-    courses = map(lambda x: x.lower(), get_titles())
+def get_one_course(command):
+    parsed_courses_names = list(map(lambda title: title.split(' '), get_titles()))
+    res = None
+    for course in parsed_courses_names:
+        isContains = True
+        for word in course:
+            length = len(word)
+            substring = word[: int(math.ceil(length * 0.75))]
+            if length < 3:
+                continue
+            if substring not in command:
+                isContains = False
+                break
+        if not isContains:
+            continue
+        res = ' '.join(course)
+    if res is None:
+        return None
+    db = firebase.database()
+    course_id = db.child("refs").child(res).get().val()
+    return db.child("dialogs").child("courses").child(course_id).get().val()
+
+
+def isRussian(command):
+    language = detect(command)
+    print(language)
+    return language == 'ru' or language == 'uk' or language == 'mk'
+
+
+def get_upper_titles():
+    courses = map(lambda x: x.capitalize(), get_titles())
     return courses
 
 
 def get_courses():
-    courses = get_titles()
+    courses = get_upper_titles()
     return '\n'.join(courses)
 
 
 @dp.request_handler(state=ConsultationStates.CONSULTATION)
 async def selecting_course(alice_request):
+    command = alice_request.request.command.lower()
+
+    if not isRussian(command):
+        return alice_request.response('Извините, я пока понимаю только русский язык, но возможно рано или поздно научусь и вашему!\n-\nSorry, I only understand Russian so far, but maybe sooner or later I will learn your language too!', buttons=['Все дисциплины', 'Команды'])
+
     text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
            'некорректно. Если вам необходим список команд, то можете сказать "Команды" '
     temp_text = None
-    command = alice_request.request.command.lower()
-
-    if re.search(r'программн\w* инженер\w*', command):
-        current_course = fetch_one_course('Программная инженерия')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'информационн\w* безопасност\w*', command):
-        current_course = fetch_one_course('Информационная безопасность')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'прикладн\w* информатик\w*', command):
-        current_course = fetch_one_course('Прикладная информатика')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'информатик\w* вычислительн\w* техник\w*', command):
-        current_course = fetch_one_course('Информатика и вычислительная техника')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'вычислительн\w* техник\w*', command):
-        current_course = fetch_one_course('Информатика и вычислительная техника')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'радиотехник\w*', command):
-        current_course = fetch_one_course('Радиотехника')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
-
-    elif re.search(r'инфокоммуникац\w* технолог\w*|систем\w* связ\w*', command):
-        current_course = fetch_one_course('Инфокоммуникационные технологии и системы связи')
-        text = get_brief_info(current_course)
-        temp_text = get_param_info(current_course, command)
+    course = get_one_course(command)
+    if course:
+        text = get_brief_info(course)
+        temp_text = get_param_info(course, command)
 
     elif re.search(r'команд\w*', command):
         text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n' \
@@ -152,13 +160,10 @@ async def selecting_course(alice_request):
     elif re.search(r'направл\w*|дисципл\w*', command):
         text = get_courses_names()
 
-    else:
-        temp_text = get_custom_dialog("courses", command)
+    elif isRussian(command):
+        temp_text = get_custom_dialog(command)
 
-    if temp_text is None:
-        temp_text = get_custom_dialog("general", command)
-
-    res_text = f'{temp_text}\n\n \n\nМожет быть вам что-то еще интересно?' \
+    res_text = f'{temp_text}\n \nМожет быть вам что-то еще интересно?' \
         if temp_text \
         else text
     await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text})
@@ -186,7 +191,7 @@ async def select_activity(alice_request):
                'и т.д.'
         buttons = ['Все дисциплины', 'Команды']
     await dp.storage.set_state(user_id, new_state)
-    temp_text = get_custom_dialog("general", command)
+    temp_text = get_custom_dialog(command)
     return alice_request.response(temp_text if temp_text else text, buttons=buttons)
 
 

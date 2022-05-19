@@ -11,7 +11,7 @@ introductions = {
 
 
 def get_brief_info(course):
-    text = [[f'{course["title"]}\n\n'],
+    text = [[f'{course["title"]}\n \n'],
             [f'{course["short_description"]}\n\n'],
             [f'{introductions["edu_form"]}', f'{course["params"]["edu_form"]}\n\n'],
             [f'{introductions["price"]}', f'{course["params"]["price"]}', f' ₽\n\n'],
@@ -31,19 +31,19 @@ def get_brief_info(course):
 def get_param_info(course, phrase):
     text_params = [
         (r'подробн\w* описан\w*|подробне\w*|поподробн\w*',
-         [f'{course["title"]}\n\nПодробное описание:\n', f'{course["full_description"]}']),
+         [f'{course["title"]}:\n\nПодробное описание:\n', f'{course["full_description"]}']),
         (r'цен\w*|стоимост\w*|денег|деньг\w*',
-         [f'{course["title"]}\n\nСтоимость обучения обойдется в ', f'{course["params"]["price"]}', ' ₽']),
+         [f'{course["title"]}:\n\nСтоимость обучения обойдется в ', f'{course["params"]["price"]}', ' ₽']),
         (r'ном\w*',
-         [f'{course["title"]}\n\nНомер направления: ', f'{course["number"]}']),
+         [f'{course["title"]}:\n\nНомер направления: ', f'{course["number"]}']),
         (r'бюдж\w* мест\w*',
-         [f'{course["title"]}\n\nБюджетных мест на направлении: ', f'{course["params"]["budget_places"]}']),
+         [f'{course["title"]}:\n\nБюджетных мест на направлении: ', f'{course["params"]["budget_places"]}']),
         (r'прох\w* бал\w*',
-         [f'{course["title"]}\n\nПроходной балл в прошлом году был: ', f'{course["params"]["pass_score"]}']),
+         [f'{course["title"]}:\n\nПроходной балл в прошлом году был: ', f'{course["params"]["pass_score"]}']),
         (r'форм\w* обуч\w*',
-         [f'{course["title"]}\n\nФорма обучения на направлении: ', f'{course["params"]["edu_form"]}']),
+         [f'{course["title"]}:\n\nФорма обучения на направлении: ', f'{course["params"]["edu_form"]}']),
         (r'руковод\w*|заведующ\w*|главный',
-         [f'{course["title"]}\n\nРуководитель направления: ', f'{course["params"]["leader"]}']),
+         [f'{course["title"]}:\n\nРуководитель направления: ', f'{course["params"]["leader"]}']),
     ]
 
     for pattern, value in text_params:
