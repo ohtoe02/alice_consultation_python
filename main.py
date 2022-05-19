@@ -35,7 +35,8 @@ dp = Dispatcher(storage=MemoryStorage())
 
 CANCEL_TEXTS = ['отмени', "отмена", 'прекрати', 'выйти', 'выход', 'назад']
 PARAMS_WORDS = ['цена', 'стоимость', 'денег', 'деньги', 'мест', 'места', '']
-ACTIVITIES_LIST = ['Профиль', 'Консультация']
+# ACTIVITIES_LIST = ['Профиль', 'Консультация']
+ACTIVITIES_LIST = ['Консультация']
 
 
 class ConsultationStates(Helper):
@@ -123,7 +124,6 @@ def get_one_course(command):
 
 def isRussian(command):
     language = detect(command)
-    print(language)
     return language == 'ru' or language == 'uk' or language == 'mk'
 
 
@@ -142,10 +142,12 @@ async def selecting_course(alice_request):
     command = alice_request.request.command.lower()
 
     if not isRussian(command):
-        return alice_request.response('Извините, я пока понимаю только русский язык, но возможно рано или поздно научусь и вашему!\n-\nSorry, I only understand Russian so far, but maybe sooner or later I will learn your language too!', buttons=['Все дисциплины', 'Команды'])
+        cur_text = 'Извините, я пока понимаю только русский язык, но возможно рано или поздно научусь и вашему!\n-\nSorry, I only understand Russian so far, but maybe sooner or later I will learn your language too!'
+        await db_push_user_request(alice_request.session.user_id, {"request": command, "response": cur_text})
+        return alice_request.response(cur_text, buttons=['Все дисциплины', 'Команды'])
 
     text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
-           'некорректно. Если вам необходим список команд, то можете сказать "Команды" '
+           'некорректно. Если вам необходим список команд, то можете сказать "Команды"'
     temp_text = None
     course = get_one_course(command)
     if course:
@@ -157,15 +159,14 @@ async def selecting_course(alice_request):
                '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n' \
                '"Команды" - для получения списка команд\n'
 
-    elif re.search(r'направл\w*|дисципл\w*', command):
+    elif re.search(r'направл\w*|дисципл\w*|курс\w*', command):
         text = get_courses_names()
 
-    elif isRussian(command):
+    else:
         temp_text = get_custom_dialog(command)
 
     res_text = f'{temp_text}\n \nМожет быть вам что-то еще интересно?' \
-        if temp_text \
-        else text
+        if temp_text else text
     await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text})
     return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
 
@@ -207,8 +208,10 @@ async def select_not_listed_activity(alice_request):
 async def handle_all_requests(alice_request):
     user_id = alice_request.session.user_id
     await dp.storage.set_state(user_id, ConsultationStates.SELECT_ACTIVITY)
+    # text = 'Привет! Чтобы приступить к консультации, достаточно сказать, написать или нажать на кнопку ' \
+    #        '"Консультация". Чтоб перейти в свой профиль, нужно попросить ассистента перейти туда. '
     text = 'Привет! Чтобы приступить к консультации, достаточно сказать, написать или нажать на кнопку ' \
-           '"Консультация". Чтоб перейти в свой профиль, нужно попросить ассистента перейти туда. '
+           '"Консультация".'
     return alice_request.response(text, buttons=ACTIVITIES_LIST)
 
 
