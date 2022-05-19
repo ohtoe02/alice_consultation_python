@@ -1,3 +1,4 @@
+import datetime
 import logging
 import re
 import string
@@ -141,10 +142,13 @@ def get_courses():
 async def selecting_course(alice_request):
     command = alice_request.request.command.lower()
 
+    if len(command) < 1:
+        return alice_request.response('Ну привет, чего ты такой неразговорчивый?', buttons=['Все дисциплины', 'Команды'])
+
     if not isRussian(command):
-        cur_text = 'Извините, я пока понимаю только русский язык, но возможно рано или поздно научусь и вашему!\n-\nSorry, I only understand Russian so far, but maybe sooner or later I will learn your language too!'
-        await db_push_user_request(alice_request.session.user_id, {"request": command, "response": cur_text})
-        return alice_request.response(cur_text, buttons=['Все дисциплины', 'Команды'])
+        res_text = 'Извините, я пока понимаю только русский язык, но возможно рано или поздно научусь и вашему!\n-\nSorry, I only understand Russian so far, but maybe sooner or later I will learn your language too!'
+        await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text, "date": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
+        return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
 
     text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
            'некорректно. Если вам необходим список команд, то можете сказать "Команды"'
@@ -167,7 +171,7 @@ async def selecting_course(alice_request):
 
     res_text = f'{temp_text}\n \nМожет быть вам что-то еще интересно?' \
         if temp_text else text
-    await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text})
+    await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text, "date": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")})
     return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
 
 
