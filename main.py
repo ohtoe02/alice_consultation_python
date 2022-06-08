@@ -106,12 +106,12 @@ def get_courses_names():
 
 
 def get_one_course(command):
-    parsed_courses_names = list(map(lambda title: title.split(' '), get_titles()))
+    parsed_courses_names = list(map(lambda title: title.lower().split(' '), get_titles()))
     res = get_keywords_answer(command, parsed_courses_names, 0.75)
     if res is None:
         return None
     db = firebase.database()
-    course_id = db.child("refs").child(res).get().val()
+    course_id = db.child("refs").child(res.capitalize()).get().val()
     return db.child("dialogs").child("courses").child(course_id).get().val()
 
 
@@ -193,8 +193,9 @@ async def selecting_course(alice_request):
     command = alice_request.request.command.lower()
 
     if len(command) < 1:
-        return alice_request.response('Ну привет, чего ты такой неразговорчивый?',
-                                      buttons=['Все дисциплины', 'Команды'])
+        return alice_request.response('Привет! Я твой личный консультант по учебным дисциплинам твоего института. '
+                                      'Спрашивай всё, что интересно, не стесняйся!',
+                                      buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
     # text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
     #        'некорректно. Если вам необходим список команд, то можете сказать "Команды"'
@@ -213,16 +214,26 @@ async def selecting_course(alice_request):
         await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text,
                                                                    "date": datetime.datetime.now().strftime(
                                                                        "%d/%m/%Y %H:%M:%S")})
-        return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
+        return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
     elif course is not None:
         text = get_brief_info(course)
         temp_text = get_param_info(course, command)
 
     elif re.search(r'команд\w*', command):
-        text = '"Институты" - для доступа к списку имеющихся институтов УрФУ\n \n' \
-               '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n \n' \
+        text = '"Дисциплины/Направления" - для получения списка доступных образовательных дисциплин\n \n' \
+               '"Параметры" - для получения списка доступных параметров образовательной дисциплины\n \n' \
                '"Команды" - для получения списка команд'
+
+    elif re.search(r'парамет\w*', command):
+        text = 'Описание всех параметров, где (*) - это название дисциплины\n \n' \
+               '"Подробнее о */подробное описание *" - для получения подробного описания образовательной дисциплины;\n \n' \
+               '"Стоимость */цена *" - для получения информации о стоимости образовательной дисциплины;\n \n' \
+               '"Номер *" - для получения информации о номере направления образовательной дисциплины;\n \n' \
+               '"Бюджетные места *" - для получения информации о количестве бюджетных мест образовательной дисциплины;\n \n' \
+               '"Балл */проходной балл *" - для получения информации о проходном балле образовательной дисциплины;\n \n' \
+               '"Форма обучения *" - для получения информации о форме обучения образовательной дисциплины;\n \n' \
+               '"Руководитель */заведующий *" - для получения информации о руководителе образовательной дисциплины.'
 
     elif re.search(r'направл\w*|дисципл\w*|курс\w*', command):
         text = get_courses_names()
@@ -235,7 +246,7 @@ async def selecting_course(alice_request):
     await db_push_user_request(alice_request.session.user_id, {"request": command, "response": res_text,
                                                                "date": datetime.datetime.now().strftime(
                                                                    "%d/%m/%Y %H:%M:%S")})
-    return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды'])
+    return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
 
 @dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
@@ -245,7 +256,7 @@ async def select_activity(alice_request):
     command = alice_request.request.command
     text = 'Такая функция пока мне неизвестна, попробуй одну из уже имеющихся!' \
         if len(command) > 0 \
-        else 'Привет! Я твой личный консультант по учебным дисциплинам твоего института. Спрашивай всё, что интересно, не стесняйся!".'
+        else 'Привет! Я твой личный консультант по учебным дисциплинам твоего института. Спрашивай всё, что интересно, не стесняйся!'
     # buttons = ACTIVITIES_LIST
     if re.search(r'консультац\w+', alice_request.request.command.lower()):
         new_state = ConsultationStates.CONSULTATION
@@ -282,7 +293,7 @@ async def handle_all_requests(alice_request):
     #        '"Консультация".'
     text = 'Привет! Я твой личный консультант по учебным дисциплинам твоего института. Спрашивай всё, что интересно, ' \
            'не стесняйся!". '
-    return alice_request.response(text, buttons=['Все дисциплины', 'Команды'])
+    return alice_request.response(text, buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
 
 if __name__ == '__main__':

@@ -32,17 +32,17 @@ def get_param_info(course, phrase):
     text_params = [
         (r'подробн\w* описан\w*|подробне\w*|поподробн\w*',
          [f'{course["title"]}:\n\n', f'{course["full_description"]}']),
-        (r'цен\w*|стоимост\w*|денег|деньг\w*',
+        (r'цен\w*|стоимост\w*|стои\w*|денег|деньг\w*',
          [f'{course["title"]}:\n\nСтоимость обучения обойдется в ', f'{course["params"]["price"]}', ' ₽']),
         (r'ном\w*',
          [f'{course["title"]}:\n\nНомер направления: ', f'{course["number"]}']),
-        (r'бюдж\w* мест\w*',
+        (r'бюдж\w* мест\w*|мест\w*',
          [f'{course["title"]}:\n\nБюджетных мест на направлении: ', f'{course["params"]["budget_places"]}']),
-        (r'прох\w* бал\w*',
+        (r'прох\w* бал\w*|бал\w*',
          [f'{course["title"]}:\n\nПроходной балл в прошлом году был: ', f'{course["params"]["pass_score"]}']),
         (r'форм\w* обуч\w*',
          [f'{course["title"]}:\n\nФорма обучения на направлении: ', f'{course["params"]["edu_form"]}']),
-        (r'руковод\w*|заведующ\w*|главный',
+        (r'руковод\w*|заведующ\w*|главн\w*',
          [f'{course["title"]}:\n\nРуководитель направления: ', f'{course["params"]["leader"]}']),
     ]
 
