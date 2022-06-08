@@ -16,8 +16,8 @@ def get_brief_info(course):
             [f'{introductions["edu_form"]}', f'{course["params"]["edu_form"]}\n\n'],
             [f'{introductions["price"]}', f'{course["params"]["price"]}', f' ₽\n\n'],
             [f'{introductions["budget_places"]}', f'{course["params"]["budget_places"]}\n\n'],
-            [f'{introductions["pass_score"]}', f'{course["params"]["pass_score"]}\n\n'],
-            [f'{introductions["leader"]}', f'{course["params"]["leader"]}']]
+            [f'{introductions["pass_score"]}', f'{course["params"]["pass_score"]}']]
+            # [f'{introductions["leader"]}', f'{course["params"]["leader"]}']]
 
     res = []
     for item in text:
@@ -31,7 +31,7 @@ def get_brief_info(course):
 def get_param_info(course, phrase):
     text_params = [
         (r'подробн\w* описан\w*|подробне\w*|поподробн\w*',
-         [f'{course["title"]}:\n\nПодробное описание:\n', f'{course["full_description"]}']),
+         [f'{course["title"]}:\n\n', f'{course["full_description"]}']),
         (r'цен\w*|стоимост\w*|денег|деньг\w*',
          [f'{course["title"]}:\n\nСтоимость обучения обойдется в ', f'{course["params"]["price"]}', ' ₽']),
         (r'ном\w*',
