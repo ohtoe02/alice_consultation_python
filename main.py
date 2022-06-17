@@ -35,16 +35,31 @@ dp = Dispatcher(storage=MemoryStorage())
 
 CANCEL_TEXTS = ['отмени', "отмена", 'прекрати', 'выйти', 'выход', 'назад']
 PARAMS_WORDS = ['цена', 'стоимость', 'денег', 'деньги', 'мест', 'места', '']
+
+
 # ACTIVITIES_LIST = ['Профиль', 'Консультация']
 # ACTIVITIES_LIST = ['Консультация']
 
 
-class ConsultationStates(Helper):
+class States(Helper):
     mode = HelperMode.snake_case
 
-    SELECT_ACTIVITY = Item()
+    INTRO = Item()
     CONSULTATION = Item()
     PROFILE = Item()
+
+
+class IntroStates(Helper):
+    mode = HelperMode.snake_case
+    EXAM_SUBJECTS = Item()
+    LAST_EXAM = Item()
+    TOTAL_SCORE = Item()
+
+
+class Subjects(Helper):
+    mode = HelperMode.snake_case
+    PHYSICS = Item()
+    INFORMATICS = Item()
 
 
 async def db_push_data(path, data):
@@ -91,6 +106,19 @@ def get_titles():
     return [item.key() for item in refs]
 
 
+def get_suitable_courses(score):
+    db = firebase.database()
+    courses_refs = db.child("dialogs").child("courses").get()
+    courses = [item.val() for item in courses_refs]
+    suitable = list(filter(lambda item: int(item['params']['pass_score']) <= score, courses))
+    return suitable
+
+
+def get_suitable_titles(score):
+    courses = get_suitable_courses(score)
+    titles = [item['title'] for item in courses]
+    return ';\n'.join(titles)
+
 def get_made_dialogs_requests(dialog_type):
     db = firebase.database()
     dialogs = db.child("dialogs").child("general").child(dialog_type).get()
@@ -98,11 +126,8 @@ def get_made_dialogs_requests(dialog_type):
     return [{"request": dialog.val()['request'], "response": dialog.val()['response']} for dialog in dialogs]
 
 
-def get_courses_names():
-    res = f'Курсы института ИРиТ-РТФ:\n \n'
-    for item in sorted(get_upper_titles()):
-        res += str(item) + ';\n'
-    return res
+def get_courses_names(score):
+    return f'Курсы института ИРиТ-РТФ:\n \n {get_suitable_titles(score)}'
 
 
 def get_one_course(command):
@@ -179,7 +204,6 @@ def isRussian(command):
 
 def get_upper_titles():
     courses = map(lambda x: x.capitalize(), get_titles())
-    print(courses)
     return courses
 
 
@@ -188,19 +212,21 @@ def get_courses():
     return '\n'.join(courses)
 
 
-@dp.request_handler(state=ConsultationStates.CONSULTATION)
+@dp.request_handler(state=States.CONSULTATION)
 async def selecting_course(alice_request):
     command = alice_request.request.command.lower()
+    user_id = alice_request.session.user_id
 
     if len(command) < 1:
+        dp.storage.set_state(user_id, States.INTRO)
         return alice_request.response('Привет! Я твой личный консультант по учебным дисциплинам твоего института. '
                                       'Спрашивай всё, что интересно, не стесняйся!',
                                       buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
-    # text = 'Извините, данная образовательная дисциплина в данный момент отсутствует, либо же была названна ' \
-    #        'некорректно. Если вам необходим список команд, то можете сказать "Команды"'
+
     text = 'Извините, я вас немного не поняла, попробуйте еще раз, либо воспользуйтесь списком команд.'
     temp_text = None
+    data = await dp.storage.get_data(user_id)
     course = get_one_course(command)
     service_dialog = get_one_service_dialog(command)
     custom_dialog = get_custom_dialog(command)
@@ -236,7 +262,7 @@ async def selecting_course(alice_request):
                '"Руководитель */заведующий *" - для получения информации о руководителе образовательной дисциплины.'
 
     elif re.search(r'направл\w*|дисципл\w*|курс\w*', command):
-        text = get_courses_names()
+        text = get_courses_names(data['total_score'])
 
     elif custom_dialog is not None:
         text = custom_dialog
@@ -249,51 +275,244 @@ async def selecting_course(alice_request):
     return alice_request.response(res_text, buttons=['Все дисциплины', 'Команды', 'Параметры'])
 
 
-@dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
-async def select_activity(alice_request):
+@dp.request_handler(state=IntroStates.TOTAL_SCORE)
+async def ask_exam_subjects(alice_request):
     user_id = alice_request.session.user_id
-    new_state = ConsultationStates.SELECT_ACTIVITY
-    command = alice_request.request.command
-    text = 'Такая функция пока мне неизвестна, попробуй одну из уже имеющихся!' \
-        if len(command) > 0 \
-        else 'Привет! Я твой личный консультант по учебным дисциплинам твоего института. Спрашивай всё, что интересно, не стесняйся!'
-    # buttons = ACTIVITIES_LIST
-    if re.search(r'консультац\w+', alice_request.request.command.lower()):
-        new_state = ConsultationStates.CONSULTATION
-        text = 'Для того, чтобы узнать подробнее о направлении обучения, спросите о нем, например, для информации о ' \
-               'программной инженерии, вы можете сказать "Расскажи о программной инженерии". Для доступа к списку ' \
-               'команд, скажите "Команды"'
-        buttons = ['Все дисциплины', 'Команды']
-    if re.search(r'профил\w+', alice_request.request.command.lower()):
-        new_state = ConsultationStates.PROFILE
-        text = 'Добро пожаловать в ваш профиль, тут отображается список интересующих вас направлений, ваши заметки ' \
-               'и т.д.'
-        buttons = ['Все дисциплины', 'Команды']
+    command = alice_request.request.command.lower()
+    new_state = States.CONSULTATION
+    buttons = []
+    text = 'Я тебя немножко не поняла, попробуй сказать еще раз'
+    try:
+        current_score = int(command)
+    except ValueError:
+        current_score = 0
+    data = await dp.storage.get_data(user_id)
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None:
+        temp_text = get_custom_dialog(command)
+    if temp_text is not None:
+        buttons = []
+        new_state = IntroStates.TOTAL_SCORE
+    elif current_score is None or current_score > 400 or current_score <= 0:
+        if current_score is not None:
+            text = 'А ты забавный, но если серьезно, то сколько баллов заработал?'
+        new_state = IntroStates.TOTAL_SCORE
+    elif current_score is not None:
+        text = f'Ты молодец! Тогда познакомлю тебя со списком подходящих дисциплин:\n \n{get_suitable_titles(current_score)} ' \
+            if current_score >= 175 \
+            else 'Извини, друг, но по твоим результатам нам нечего тебе предложить, но ты можешь ознакомиться со ' \
+                 'всеми имеющимися дисциплинами или же указать свои данные снова. '
+        buttons = ['Все дисциплины', 'Команды', 'Параметры'] if current_score >= 175 else ['Подобрать снова', 'Хочу просто ознакомиться']
+        if current_score < 175:
+            new_state = States.INTRO
+        data['total_score'] = current_score
+        await dp.storage.update_data(user_id, data)
+
     await dp.storage.set_state(user_id, new_state)
-    temp_text = get_custom_dialog(command)
     return alice_request.response(temp_text if temp_text else text, buttons=buttons)
 
 
-@dp.request_handler(state=ConsultationStates.SELECT_ACTIVITY)
-async def select_not_listed_activity(alice_request):
-    return alice_request.response(
+@dp.request_handler(state=IntroStates.LAST_EXAM)
+async def ask_exam_subjects(alice_request):
+    user_id = alice_request.session.user_id
+    command = alice_request.request.command.lower()
+    user_data = await dp.storage.get_data(user_id)
+    new_state = IntroStates.EXAM_SUBJECTS
+    text = 'Я тебя немножко не поняла, попробуй сказать еще раз'
+    buttons = ['Да', 'Нет']
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None:
+        temp_text = get_custom_dialog(command)
+    if temp_text is not None:
+        buttons = ['Да', 'Нет']
+        new_state = IntroStates.LAST_EXAM
+    elif re.search(r'да', command):
+        new_state = Subjects.PHYSICS if user_data['exams']['physics'] is None else Subjects.INFORMATICS
+        buttons = []
+        text = 'И сколько баллов получилось заработать?'
+    elif re.search(r'не\w+', command):
+        new_state = IntroStates.TOTAL_SCORE
+        buttons = []
+        text = 'Тогда скажи, пожалуйста, сколько баллов набрал в сумме по всем экзаменам ЕГЭ?'
 
-        # buttons=ACTIVITIES_LIST
-        buttons=[]
-    )
+    await dp.storage.set_state(user_id, new_state)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
+
+
+@dp.request_handler(state=Subjects.PHYSICS)
+async def physics_results(alice_request):
+    user_id = alice_request.session.user_id
+    command = alice_request.request.command.lower()
+    text = 'Немножко не поняла, попробуй еще раз'
+    new_state = Subjects.PHYSICS
+    try:
+        current_score = int(command)
+    except ValueError:
+        current_score = 0
+    data = await dp.storage.get_data(user_id)
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    buttons = []
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None or current_score is None:
+        temp_text = get_custom_dialog(command)
+    if current_score is None or current_score > 100 or current_score <= 0:
+        if current_score is not None:
+            text = 'А ты забавный, но если серьезно, то сколько баллов заработал?'
+        new_state = Subjects.PHYSICS
+    elif data['exams']['physics'] is None:
+        text = 'Нехило ты набрал, молодчинка, а информатику тебе приходилось сдавать?' if data['exams']['informatics'] is None else 'Тогда скажи, пожалуйста, сколько баллов набрал в сумме по всем экзаменам ЕГЭ?'
+        data['exams']['physics'] = current_score
+        buttons = ['Да', 'Нет'] if data['exams']['informatics'] is None else []
+        new_state = IntroStates.LAST_EXAM
+        await dp.storage.update_data(user_id, data)
+    if data['exams']['physics'] is not None and data['exams']['informatics'] is not None:
+        text = 'Тогда скажи, пожалуйста, сколько баллов набрал в сумме по всем экзаменам ЕГЭ?'
+        new_state = IntroStates.TOTAL_SCORE
+    if temp_text is not None:
+        buttons = []
+        new_state = Subjects.PHYSICS
+
+    await dp.storage.set_state(user_id, new_state)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
+
+
+@dp.request_handler(state=Subjects.INFORMATICS)
+async def informatics_results(alice_request):
+    user_id = alice_request.session.user_id
+    command = alice_request.request.command.lower()
+    text = 'Немножко не поняла, попробуй еще раз'
+    new_state = Subjects.INFORMATICS
+    try:
+        current_score = int(command)
+    except ValueError:
+        current_score = 0
+    data = await dp.storage.get_data(user_id)
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    print(temp_text)
+    buttons = []
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None:
+        temp_text = get_custom_dialog(command)
+
+    if current_score is None or current_score > 100 or current_score <= 0:
+        if current_score is not None:
+            text = 'А ты забавный, но если серьезно, то сколько баллов заработал?'
+        new_state = Subjects.INFORMATICS
+    elif data['exams']['informatics'] is None:
+        text = 'Это очень хороший результат, ты супер! А физику приходилось сдавать?' if data['exams']['physics'] is None else 'Тогда скажи, пожалуйста, сколько баллов набрал в сумме по всем экзаменам ЕГЭ?'
+        data['exams']['informatics'] = current_score
+        buttons = ['Да', 'Нет'] if data['exams']['physics'] is None else []
+        new_state = IntroStates.LAST_EXAM
+        await dp.storage.update_data(user_id, data)
+    if data['exams']['physics'] is not None and data['exams']['informatics'] is not None:
+        text = 'Тогда скажи, пожалуйста, сколько баллов набрал в сумме по всем экзаменам ЕГЭ?'
+        new_state = IntroStates.TOTAL_SCORE
+    if temp_text is not None:
+        buttons = []
+        new_state = Subjects.INFORMATICS
+
+    await dp.storage.set_state(user_id, new_state)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
+
+
+@dp.request_handler(state=IntroStates.EXAM_SUBJECTS)
+async def ask_exam_subjects(alice_request):
+    user_id = alice_request.session.user_id
+    command = alice_request.request.command.lower()
+    new_state = IntroStates.EXAM_SUBJECTS
+    buttons = []
+    text = 'Я тебя немножко не поняла, попробуй сказать еще раз'
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None:
+        temp_text = get_custom_dialog(command)
+    if temp_text is not None:
+        buttons = ['Физика', 'Информатика']
+        new_state = IntroStates.EXAM_SUBJECTS
+    elif re.search(r'физи\w+', command):
+        new_state = Subjects.PHYSICS
+        text = 'О, да ты прям как Эйнштейн, а сколько баллов набрал?'
+    elif re.search(r'информ\w+', command):
+        new_state = Subjects.INFORMATICS
+        text = 'Будешь прям как Билл Гейтс. И сколько же баллов получил?'
+    else:
+        buttons = ['Физика', 'Информатика']
+        await dp.storage.set_data(user_id, {'exams': {'physics': None, 'informatics': None}, 'total_score': None})
+
+    await dp.storage.set_state(user_id, new_state)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
+
+
+@dp.request_handler(state=States.INTRO)
+async def select_activity(alice_request):
+    user_id = alice_request.session.user_id
+    command = alice_request.request.command.lower()
+    new_state = States.INTRO
+    buttons = []
+    text = 'Я тебя немножко не поняла, попробуй сказать еще раз'
+    try:
+        temp_text = get_one_service_dialog(command)['response']
+    except TypeError:
+        temp_text = None
+    if len(command) == 0:
+        text = 'И чего молчим, ничего не говорим?'
+    elif temp_text is None:
+        temp_text = get_custom_dialog(command)
+    if temp_text is not None:
+        buttons = ['Давай подберём', 'Хочу просто ознакомиться']
+        new_state = States.INTRO
+    elif re.search(r'подбер\w+|подобр\w*', command) \
+            or command == 'давай' or command == 'давай подберем' or command == 'да':
+        text = 'Отлично, тогда мне очень интересно, какие ты профильные экзамены сдавал, может физику или информатику?'
+        buttons = ['Физика', 'Информатика']
+        new_state = IntroStates.EXAM_SUBJECTS
+        await dp.storage.set_data(user_id, {'exams': {'physics': None, 'informatics': None}, 'total_score': None})
+    elif re.search(r'ознаком\w+|посмотр\w*',
+                   command) or command == 'хочу просто ознакомиться' or command == 'не надо' or command == 'нет':
+        new_state = States.CONSULTATION
+        text = 'Хорошо, тогда спрашивай меня всё, что тебе интересно о дисциплинах, я тебя слушаю!'
+        buttons = ['Все дисциплины', 'Команды', 'Параметры']
+        await dp.storage.set_data(user_id, {'exams': {'physics': 100, 'informatics': 100}, 'total_score': 300})
+
+    await dp.storage.set_state(user_id, new_state)
+    return alice_request.response(temp_text if temp_text else text, buttons=buttons)
 
 
 @dp.request_handler()
 async def handle_all_requests(alice_request):
     user_id = alice_request.session.user_id
-    await dp.storage.set_state(user_id, ConsultationStates.CONSULTATION)
     # text = 'Привет! Чтобы приступить к консультации, достаточно сказать, написать или нажать на кнопку ' \
     #        '"Консультация". Чтоб перейти в свой профиль, нужно попросить ассистента перейти туда. '
     # text = 'Привет! Чтобы приступить к консультации, достаточно сказать, написать или нажать на кнопку ' \
     #        '"Консультация".'
-    text = 'Привет! Я твой личный консультант по учебным дисциплинам твоего института. Спрашивай всё, что интересно, ' \
-           'не стесняйся!". '
-    return alice_request.response(text, buttons=['Все дисциплины', 'Команды', 'Параметры'])
+    text = 'Привет! Я твой личный консультант по учебным дисциплинам твоего института, можешь задавать мне все ' \
+           'интересующие тебя вопросы!\n \nХочешь подобрать подходящие для тебя дисциплины или же желаешь просто ' \
+           'ознакомиться со всеми?'
+    await dp.storage.set_state(user_id, States.INTRO)
+    await dp.storage.set_data(user_id, {'exams': {'physics': None, 'informatics': None}, 'total_score': None})
+    return alice_request.response(text, buttons=['Давай подберём', 'Хочу просто ознакомиться'])
 
 
 if __name__ == '__main__':
